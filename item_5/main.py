@@ -1,19 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict
+from transformers import pipeline
 
 app = FastAPI()
 
-class Text(BaseModel):
+class TextRequest(BaseModel):
     text: str
 
-@app.post("/summarize/")
-async def summarize_text(text: Text) -> Dict[str, str]:
-    words = text.text.split()
-    summary = ' '.join(words[:100])  # Simplistic approach to return first 100 words
-    return {"summary": summary}
+summarizer = pipeline("summarization")
 
-@app.post("/token-count/")
-async def token_count(text: Text) -> Dict[str, int]:
-    tokens = text.text.split()
-    return {"token_count": len(tokens)}
+@app.post("/summarize")
+async def summarize_text(request: TextRequest):
+    try:
+        summary = summarizer(request.text, max_length=100, min_length=30, do_sample=False)
+        return {"summary": summary[0]['summary_text']}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/token_count")
+async def count_tokens(request: TextRequest):
+    try:
+        tokens = request.text.split()
+        return {"token_count": len(tokens)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
